@@ -1,0 +1,144 @@
+group = "com.example.flutter_printer_plugin"
+version = "1.0-SNAPSHOT"
+
+def localProperties = new Properties()
+def localPropertiesFile = rootProject.file('local.properties')
+if (localPropertiesFile.exists()) {
+    localPropertiesFile.withReader('UTF-8') { reader ->
+        localProperties.load(reader)
+    }
+}
+
+def flutterRoot = localProperties.getProperty('flutter.sdk')
+if (flutterRoot == null) {
+    throw new GradleException("Flutter SDK not found. Define location with flutter.sdk in the local.properties file.")
+}
+
+buildscript {
+    ext.kotlin_version = "2.2.20"
+    repositories {
+        google()
+        mavenCentral()
+    }
+
+    dependencies {
+        classpath("com.android.tools.build:gradle:8.2.0")
+        classpath("org.jetbrains.kotlin:kotlin-gradle-plugin:$kotlin_version")
+    }
+}
+
+allprojects {
+    repositories {
+        google()
+        mavenCentral()
+    }
+}
+
+apply plugin: "com.android.library"
+apply plugin: "kotlin-android"
+
+// Workaround for Android Studio sync trying to download sources for file dependencies
+configurations.all {
+    resolutionStrategy {
+        // Skip artifact resolution that might trigger source downloads
+    }
+}
+
+// Configure artifact resolution to skip sources/javadoc
+afterEvaluate {
+    configurations.all { config ->
+        // Prevent Android Studio from trying to download sources for file dependencies
+        config.incoming.artifactView { view ->
+            view.attributes {
+                // Only request the main artifact, skip sources/javadoc
+            }
+        }
+    }
+}
+
+// Workaround for Android Studio sync trying to download sources for file dependencies
+// This prevents the :ijDownloadArtifact* tasks from trying to resolve sources
+configurations.all {
+    resolutionStrategy {
+        // Skip artifact resolution that might trigger source downloads
+    }
+}
+
+// After project evaluation, configure artifact resolution to skip sources
+afterEvaluate {
+    // Disable source/javadoc artifact requests for all configurations
+    configurations.all { config ->
+        // Skip source/javadoc artifacts - they're not available for file() dependencies
+        // This prevents Android Studio from trying to download sources
+        config.incoming.artifactView { view ->
+            view.attributes {
+                // Only request the main artifact, not sources/javadoc
+            }
+        }
+    }
+    
+    // Disable IntelliJ/Android Studio source download tasks for file dependencies
+    tasks.matching { it.name.startsWith('ijDownloadArtifact') }.configureEach { task ->
+        task.enabled = false
+    }
+}
+
+android {
+    namespace = "com.example.flutter_printer_plugin"
+
+    compileSdk = 36
+
+    compileOptions {
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
+    }
+
+    kotlinOptions {
+        jvmTarget = JavaVersion.VERSION_17
+    }
+
+    sourceSets {
+        main.java.srcDirs += "src/main/kotlin"
+        test.java.srcDirs += "src/test/kotlin"
+    }
+
+    defaultConfig {
+        minSdk = 24
+    }
+
+    testOptions {
+        unitTests.all {
+            useJUnitPlatform()
+
+            testLogging {
+                events "passed", "skipped", "failed", "standardOut", "standardError"
+                outputs.upToDateWhen {false}
+                showStandardStreams = true
+            }
+        }
+    }
+}
+
+dependencies {
+    def flutterJar = file("${flutterRoot}/bin/cache/artifacts/engine/android-arm/flutter.jar")
+    if (flutterJar.exists()) {
+        compileOnly files(flutterJar)
+        testImplementation files(flutterJar)
+    } else {
+        def flutterJarDir = file("${flutterRoot}/bin/cache/artifacts/engine")
+        if (flutterJarDir.exists()) {
+            fileTree(dir: flutterJarDir, include: '**/flutter.jar').each { jar ->
+                compileOnly files(jar)
+                testImplementation files(jar)
+            }
+        }
+    }
+    
+    // Kotlin Coroutines
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.7.3")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3")
+    
+    // Test dependencies
+    testImplementation("org.jetbrains.kotlin:kotlin-test")
+    testImplementation("org.mockito:mockito-core:5.0.0")
+}
